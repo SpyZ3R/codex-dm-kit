@@ -124,7 +124,9 @@ def inspect_target(target: Path) -> dict[str, Any]:
 def _load_answers(source: Path | str) -> dict[str, Any]:
     try:
         if str(source) == "-":
-            data = json.loads(sys.stdin.read())
+            binary_stdin = getattr(sys.stdin, "buffer", None)
+            raw_answers = binary_stdin.read().decode("utf-8-sig") if binary_stdin else sys.stdin.read()
+            data = json.loads(raw_answers)
         else:
             path = Path(source).expanduser().resolve()
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -132,6 +134,8 @@ def _load_answers(source: Path | str) -> dict[str, Any]:
         raise CampaignCreationError(f"answers file does not exist: {source}") from exc
     except json.JSONDecodeError as exc:
         raise CampaignCreationError(f"answers JSON is invalid: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise CampaignCreationError("answers supplied over stdin must be UTF-8") from exc
     if not isinstance(data, dict):
         raise CampaignCreationError("answers must be a JSON object")
     for key in ("campaign_title", "language", "player", "setting", "opening_hook"):

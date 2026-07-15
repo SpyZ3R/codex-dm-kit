@@ -27,6 +27,7 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP "codex-dm-smoke"
+          $answers = Get-Content "$env:GITHUB_WORKSPACE/examples/onboarding_answers.ru.json" -Raw -Encoding UTF8
           Set-Location $env:RUNNER_TEMP
-          python -m codex_dm_kit create --answers "$env:GITHUB_WORKSPACE/examples/onboarding_answers.ru.json" --target $target
+          $answers | python -m codex_dm_kit create --answers - --target $target
           python (Join-Path $target "tools/codex_dm.py") validate

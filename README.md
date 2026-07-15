@@ -21,7 +21,7 @@ Source:
 https://github.com/SpyZ3R/codex-dm-kit
 
 Release ref:
-v0.1.0
+v0.1.1
 
 Work autonomously:
 
