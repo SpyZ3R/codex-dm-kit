@@ -69,6 +69,7 @@ class RuntimeTests(unittest.TestCase):
 
     def test_dashboard_allowlist_excludes_secrets_and_hidden_quests(self) -> None:
         marker = "TOP-SECRET-MOON-KEY"
+        original_public_hash = self.runtime.public_state_hash(self.root)
         (self.root / "secrets.md").write_text(marker, encoding="utf-8")
         quests_path = self.root / "quests.json"
         quests = json.loads(quests_path.read_text(encoding="utf-8"))
@@ -83,9 +84,14 @@ class RuntimeTests(unittest.TestCase):
             "status": "hidden",
         })
         quests_path.write_text(json.dumps(quests, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        locations_path = self.root / "locations.json"
+        locations = json.loads(locations_path.read_text(encoding="utf-8"))
+        locations[0]["secrets"].append(marker)
+        locations_path.write_text(json.dumps(locations, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         self.runtime.write_dashboard_data(self.root)
         dashboard = (self.root / "dashboard" / "dashboard_data.js").read_text(encoding="utf-8")
         self.assertNotIn(marker, dashboard)
+        self.assertEqual(self.runtime.public_state_hash(self.root), original_public_hash)
 
     def test_dashboard_is_file_url_compatible_and_renders_imports_as_text(self) -> None:
         html = (self.root / "dashboard" / "index.html").read_text(encoding="utf-8")

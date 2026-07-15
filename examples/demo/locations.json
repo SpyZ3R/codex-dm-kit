@@ -8,10 +8,27 @@
     "dangers": [],
     "visible_clues": [],
     "secrets": [],
+    "related_npcs": [
+      "mara-reed"
+    ],
+    "related_quests": [
+      "opening_hook"
+    ],
+    "visual_description": ""
+  },
+  {
+    "id": "sunken-bell-road",
+    "name": "Затопленный колокольный тракт",
+    "description": "Старая дорога уходит под чёрную воду между редкими сигнальными столбами.",
+    "atmosphere": "камыш шуршит против ветра, а под водой иногда отвечает металл",
     "related_npcs": [],
     "related_quests": [
       "opening_hook"
     ],
+    "inhabitants": [],
+    "dangers": [],
+    "visible_clues": [],
+    "secrets": [],
     "visual_description": ""
   }
 ]

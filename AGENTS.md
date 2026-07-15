@@ -6,6 +6,8 @@ This repository is a public campaign generator, not a live campaign. Never treat
 
 The user's currently opened workspace root is the campaign target. Do not suggest a default storage folder.
 
+Use `python` for kit commands; on Windows, use `py` if `python` is unavailable.
+
 Before asking Session Zero questions:
 
 1. Resolve and show the absolute workspace root.
@@ -27,11 +29,11 @@ If the user has no character or setting, offer a small number of concrete choice
 
 Before writing campaign files, show a concise final concept and obtain explicit confirmation.
 
-Create the campaign with:
+Keep the normalized Session Zero answers in memory and pass them over stdin. Never save campaign answers inside the kit checkout or another temporary file. Create the campaign with:
 
-`python -m codex_dm_kit create --answers <answers.json> --target <workspace-root>`
+`python -m codex_dm_kit create --answers - --target <workspace-root>`
 
-The answers file must stay in this temporary kit checkout or the system temporary directory; do not place it in the user's campaign unless they ask.
+The JSON supplied over stdin may contain character details, boundaries, and setting material. Do not echo it into logs or retain a second copy.
 
 After creation:
 
@@ -46,5 +48,5 @@ Do not run `git init` in the campaign, upload its files, create backup archives,
 
 - Runtime code supports Python 3.10+ with no third-party dependencies.
 - Run `python -m unittest discover -s tests -v` after changes.
-- Run `python -m codex_dm_kit create --dry-run` against the example answers when changing templates.
+- Run `python -m codex_dm_kit create --answers examples/onboarding_answers.ru.json --target <safe-non-Git-temp-dir> --dry-run` when changing templates.
 - Do not copy content, names, or secrets from a user's live campaign into this repository.

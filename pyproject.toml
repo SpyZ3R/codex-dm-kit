@@ -18,6 +18,11 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
 ]
 
+[project.urls]
+Homepage = "https://github.com/SpyZ3R/codex-dm-kit"
+Repository = "https://github.com/SpyZ3R/codex-dm-kit"
+Issues = "https://github.com/SpyZ3R/codex-dm-kit/issues"
+
 [project.scripts]
 codex-dm-kit = "codex_dm_kit.__main__:main"
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from copy import deepcopy
@@ -48,7 +50,7 @@ def _now() -> str:
 
 
 def _slug(value: str) -> str:
-    value = re.sub(r"[^a-zA-Z0-9_-]+", "-", value.strip().lower()).strip("-")
+    value = re.sub(r"[^\w-]+", "-", value.strip().lower(), flags=re.UNICODE).strip("-_")
     return value or "campaign"
 
 
@@ -64,21 +66,42 @@ def _git_worktree(path: Path) -> bool:
             text=True,
             check=False,
         )
-        return result.returncode == 0 and result.stdout.strip().lower() == "true"
+        if result.returncode == 0 and result.stdout.strip().lower() == "true":
+            return True
 
     cursor = path.resolve()
     while True:
-        if (cursor / ".git").exists():
+        metadata = cursor / ".git"
+        if metadata.is_file():
+            try:
+                if metadata.read_text(encoding="utf-8", errors="replace").lstrip().startswith("gitdir:"):
+                    return True
+            except OSError:
+                return True
+        elif metadata.is_dir() and (metadata / "HEAD").is_file():
             return True
         if cursor.parent == cursor:
             return False
         cursor = cursor.parent
 
 
+def _initialized_campaign(path: Path) -> bool:
+    try:
+        meta = json.loads((path / "campaign_meta.json").read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(meta, dict)
+        and meta.get("initialized") is True
+        and meta.get("schema_version") == 1
+        and isinstance(meta.get("kit_version"), str)
+    )
+
+
 def inspect_target(target: Path) -> dict[str, Any]:
     target = target.expanduser().resolve()
     inside_git_worktree = _git_worktree(target)
-    contains_git_metadata = (target / ".git").exists()
+    contains_git_metadata = (target / ".git").exists() or (target / ".git").is_symlink()
     existing = sorted(
         str(item.relative_to(target))
         for item in target.rglob("*")
@@ -94,15 +117,19 @@ def inspect_target(target: Path) -> dict[str, Any]:
         "contains_git_metadata": contains_git_metadata,
         "existing_files": existing,
         "collisions": collisions,
-        "already_initialized": (target / "campaign_meta.json").exists(),
+        "already_initialized": _initialized_campaign(target),
     }
 
 
-def _load_answers(path: Path) -> dict[str, Any]:
+def _load_answers(source: Path | str) -> dict[str, Any]:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        if str(source) == "-":
+            data = json.loads(sys.stdin.read())
+        else:
+            path = Path(source).expanduser().resolve()
+            data = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
-        raise CampaignCreationError(f"answers file does not exist: {path}") from exc
+        raise CampaignCreationError(f"answers file does not exist: {source}") from exc
     except json.JSONDecodeError as exc:
         raise CampaignCreationError(f"answers JSON is invalid: {exc}") from exc
     if not isinstance(data, dict):
@@ -116,7 +143,42 @@ def _load_answers(path: Path) -> dict[str, Any]:
         raise CampaignCreationError("player.name is required")
     if not isinstance(data["setting"], dict) or not data["setting"].get("starting_location"):
         raise CampaignCreationError("setting.starting_location is required")
+    opening_hook = data["opening_hook"]
+    if isinstance(opening_hook, dict):
+        if not str(opening_hook.get("summary", "")).strip():
+            raise CampaignCreationError("opening_hook.summary is required when opening_hook is an object")
+    elif not str(opening_hook).strip():
+        raise CampaignCreationError("opening_hook must be a non-empty string or object")
+    if "preferences" in data and not isinstance(data["preferences"], dict):
+        raise CampaignCreationError("preferences must be an object")
     return data
+
+
+def _opening_hook_text(opening_hook: Any) -> str:
+    if not isinstance(opening_hook, dict):
+        return str(opening_hook).strip()
+    title = str(opening_hook.get("title", "")).strip()
+    summary = str(opening_hook.get("summary", "")).strip()
+    return f"{title} — {summary}" if title else summary
+
+
+def _inline_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value)).strip()
+
+
+def _list_text(value: Any, fallback: str) -> str:
+    if isinstance(value, list):
+        rendered = ", ".join(_inline_text(item) for item in value if _inline_text(item))
+        return rendered or fallback
+    rendered = _inline_text(value) if value is not None else ""
+    return rendered or fallback
+
+
+def _play_mix_text(value: Any, fallback: str) -> str:
+    if isinstance(value, dict):
+        rendered = ", ".join(f"{_inline_text(key)}: {_inline_text(amount)}" for key, amount in value.items())
+        return rendered or fallback
+    return _list_text(value, fallback)
 
 
 def _tokens(answers: dict[str, Any]) -> dict[str, str]:
@@ -124,17 +186,20 @@ def _tokens(answers: dict[str, Any]) -> dict[str, str]:
     setting = answers["setting"]
     preferences = answers.get("preferences", {})
     language = answers["language"]
+    unspecified = "не указано" if language == "ru" else "not specified"
     return {
-        "CAMPAIGN_TITLE": str(answers["campaign_title"]),
+        "CAMPAIGN_TITLE": _inline_text(answers["campaign_title"]),
         "CAMPAIGN_SLUG": _slug(str(answers.get("campaign_slug") or answers["campaign_title"])),
         "LANGUAGE": language,
         "LANGUAGE_NAME": "русский" if language == "ru" else "English",
-        "PLAYER_NAME": str(player["name"]),
-        "SETTING_NAME": str(setting.get("name", answers["campaign_title"])),
-        "SETTING_PREMISE": str(setting.get("premise", "")),
-        "TONE": str(preferences.get("tone", "adventure with real consequences")),
-        "BOUNDARIES": ", ".join(map(str, preferences.get("boundaries", []))) or "not specified",
-        "OPENING_HOOK": str(answers["opening_hook"]),
+        "PLAYER_NAME": _inline_text(player["name"]),
+        "SETTING_NAME": _inline_text(setting.get("name", answers["campaign_title"])),
+        "SETTING_PREMISE": _inline_text(setting.get("premise", "")),
+        "TONE": _inline_text(preferences.get("tone", "adventure with real consequences")),
+        "BOUNDARIES": _list_text(preferences.get("boundaries"), unspecified),
+        "LETHALITY": _list_text(preferences.get("lethality"), unspecified),
+        "PLAY_MIX": _play_mix_text(preferences.get("play_mix"), unspecified),
+        "OPENING_HOOK": _inline_text(_opening_hook_text(answers["opening_hook"])),
         "CREATED_AT": _now(),
         "KIT_VERSION": __version__,
     }
@@ -159,9 +224,25 @@ def _player_state(answers: dict[str, Any]) -> dict[str, Any]:
         "wisdom": 10,
         "charisma": 10,
     }
-    modifiers = source.get("modifiers") or {key: (int(value) - 10) // 2 for key, value in stats.items()}
+    if not isinstance(stats, dict):
+        raise CampaignCreationError("player.stats must be an object")
+    try:
+        stats = {str(key): int(value) for key, value in stats.items()}
+    except (TypeError, ValueError) as exc:
+        raise CampaignCreationError("player.stats values must be integers") from exc
+    modifiers = source.get("modifiers") or {key: (value - 10) // 2 for key, value in stats.items()}
+    if not isinstance(modifiers, dict):
+        raise CampaignCreationError("player.modifiers must be an object")
+    try:
+        modifiers = {str(key): int(value) for key, value in modifiers.items()}
+    except (TypeError, ValueError) as exc:
+        raise CampaignCreationError("player.modifiers values must be integers") from exc
     level = int(source.get("level", 1))
-    hp = source.get("hp") or {"current": 8, "max": 8, "temp": 0}
+    if not 1 <= level <= 20:
+        raise CampaignCreationError("player.level must be between 1 and 20")
+    constitution_modifier = int(modifiers.get("constitution", 0))
+    default_hp = max(1, 8 + constitution_modifier) + (level - 1) * max(1, 5 + constitution_modifier)
+    hp = source.get("hp") or {"current": default_hp, "max": default_hp, "temp": 0}
     return {
         "name": source["name"],
         "pronouns": source.get("pronouns", "not specified"),
@@ -173,11 +254,11 @@ def _player_state(answers: dict[str, Any]) -> dict[str, Any]:
         "alignment": source.get("alignment", "not specified"),
         "rest_state": source.get("rest_state", "ready to begin"),
         "advancement": source.get("advancement", {"method": "milestone", "xp_tracking": False}),
-        "proficiency_bonus": int(source.get("proficiency_bonus", 2)),
+        "proficiency_bonus": int(source.get("proficiency_bonus", 2 + (level - 1) // 4)),
         "stats": stats,
         "modifiers": modifiers,
         "hp": hp,
-        "hit_dice": source.get("hit_dice", {"die": "d8", "current": level, "max": level, "constitution_modifier": modifiers.get("constitution", 0)}),
+        "hit_dice": source.get("hit_dice", {"die": "d8", "current": level, "max": level, "constitution_modifier": constitution_modifier}),
         "ac": int(source.get("ac", 10 + modifiers.get("dexterity", 0))),
         "speed": int(source.get("speed", 30)),
         "saving_throws": source.get("saving_throws", {}),
@@ -203,9 +284,35 @@ def _location_id(setting: dict[str, Any]) -> str:
 
 def _locations(answers: dict[str, Any]) -> list[dict[str, Any]]:
     setting = answers["setting"]
+    starting_id = _location_id(setting)
     supplied = setting.get("locations")
     if isinstance(supplied, list) and supplied:
-        return supplied
+        normalized: list[dict[str, Any]] = []
+        for index, raw_location in enumerate(supplied):
+            if not isinstance(raw_location, dict):
+                raise CampaignCreationError(f"setting.locations[{index}] must be an object")
+            location = deepcopy(raw_location)
+            name = _inline_text(location.get("name") or f"Location {index + 1}")
+            location["id"] = _slug(str(location.get("id") or name))
+            location["name"] = name
+            location.setdefault("description", "")
+            location.setdefault("atmosphere", "")
+            location.setdefault("inhabitants", [])
+            location.setdefault("dangers", [])
+            location.setdefault("visible_clues", [])
+            location.setdefault("secrets", [])
+            location.setdefault("related_npcs", [])
+            location.setdefault("related_quests", ["opening_hook"] if location["id"] == starting_id else [])
+            location.setdefault("visual_description", "")
+            for field in ("inhabitants", "dangers", "visible_clues", "secrets", "related_npcs", "related_quests"):
+                if not isinstance(location[field], list):
+                    raise CampaignCreationError(f"setting.locations[{index}].{field} must be an array")
+            normalized.append(location)
+        if starting_id not in {location["id"] for location in normalized}:
+            raise CampaignCreationError("setting.starting_location must match an entry in setting.locations")
+        return normalized
+    if supplied is not None and not isinstance(supplied, list):
+        raise CampaignCreationError("setting.locations must be an array")
     raw = setting["starting_location"]
     if isinstance(raw, dict):
         name = str(raw.get("name") or "Starting location")
@@ -230,6 +337,34 @@ def _locations(answers: dict[str, Any]) -> list[dict[str, Any]]:
     }]
 
 
+def _npcs(answers: dict[str, Any]) -> list[dict[str, Any]]:
+    supplied = answers.get("npcs", [])
+    if not isinstance(supplied, list):
+        raise CampaignCreationError("npcs must be an array")
+    normalized: list[dict[str, Any]] = []
+    for index, raw_npc in enumerate(supplied):
+        if not isinstance(raw_npc, dict):
+            raise CampaignCreationError(f"npcs[{index}] must be an object")
+        npc = deepcopy(raw_npc)
+        name = _inline_text(npc.get("name") or f"NPC {index + 1}")
+        npc["id"] = _slug(str(npc.get("id") or name))
+        npc["name"] = name
+        npc.setdefault("role", "")
+        npc.setdefault("status", "active")
+        npc.setdefault("attitude", "neutral")
+        npc.setdefault("location", None)
+        npc.setdefault("knows", [])
+        npc.setdefault("does_not_know", [])
+        npc.setdefault("knowledge_sources", [])
+        npc.setdefault("goals", [])
+        npc.setdefault("related_quests", [])
+        for field in ("knows", "does_not_know", "knowledge_sources", "goals", "related_quests"):
+            if not isinstance(npc[field], list):
+                raise CampaignCreationError(f"npcs[{index}].{field} must be an array")
+        normalized.append(npc)
+    return normalized
+
+
 def _state_files(answers: dict[str, Any], tokens: dict[str, str]) -> dict[str, str]:
     setting = answers["setting"]
     opening = answers["opening_hook"]
@@ -247,9 +382,10 @@ def _state_files(answers: dict[str, Any], tokens: dict[str, str]) -> dict[str, s
             "language": answers["language"],
             "ruleset": "dnd_5e_light",
             "created_at": tokens["CREATED_AT"],
+            "preferences": deepcopy(answers.get("preferences", {})),
         },
         "player_state.json": _player_state(answers),
-        "npcs.json": answers.get("npcs", []),
+        "npcs.json": _npcs(answers),
         "quests.json": {
             "active": [{
                 "id": "opening_hook",
@@ -296,8 +432,57 @@ def _state_files(answers: dict[str, Any], tokens: dict[str, str]) -> dict[str, s
     }
 
 
-def create_campaign(answers_path: Path, target: Path, *, dry_run: bool = False) -> dict[str, Any]:
-    answers_path = answers_path.expanduser().resolve()
+def _is_reparse_point(path: Path) -> bool:
+    try:
+        metadata = os.lstat(path)
+    except FileNotFoundError:
+        return False
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    return stat.S_ISLNK(metadata.st_mode) or bool(reparse_flag and attributes & reparse_flag)
+
+
+def _mkdir_tracked(path: Path, created_dirs: list[Path]) -> None:
+    missing: list[Path] = []
+    cursor = path
+    while not cursor.exists():
+        if _is_reparse_point(cursor):
+            raise CampaignCreationError(f"refusing to use a reparse point: {cursor}")
+        missing.append(cursor)
+        if cursor.parent == cursor:
+            break
+        cursor = cursor.parent
+    if cursor.exists() and not cursor.is_dir():
+        raise CampaignCreationError(f"expected a directory but found a file: {cursor}")
+    for directory in reversed(missing):
+        try:
+            directory.mkdir()
+            created_dirs.append(directory)
+        except FileExistsError:
+            if not directory.is_dir() or _is_reparse_point(directory):
+                raise CampaignCreationError(f"unsafe directory appeared during creation: {directory}")
+
+
+def _assert_safe_destination(root: Path, relative: str) -> Path:
+    relative_path = Path(relative)
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise CampaignCreationError(f"unsafe generated path: {relative}")
+    destination = root / relative_path
+    cursor = root
+    for part in relative_path.parts[:-1]:
+        cursor /= part
+        if _is_reparse_point(cursor):
+            raise CampaignCreationError(f"refusing to write through a reparse point: {cursor}")
+    try:
+        destination.parent.resolve().relative_to(root.resolve())
+    except ValueError as exc:
+        raise CampaignCreationError(f"generated path escapes the campaign root: {relative}") from exc
+    if destination.exists() or _is_reparse_point(destination):
+        raise CampaignCreationError(f"refusing to overwrite a file created after inspection: {relative}")
+    return destination
+
+
+def create_campaign(answers_path: Path | str, target: Path, *, dry_run: bool = False) -> dict[str, Any]:
     target = target.expanduser().resolve()
     answers = _load_answers(answers_path)
     inspection = inspect_target(target)
@@ -332,14 +517,17 @@ def create_campaign(answers_path: Path, target: Path, *, dry_run: bool = False) 
     if dry_run:
         return result
 
-    target.mkdir(parents=True, exist_ok=True)
     created: list[Path] = []
+    created_dirs: list[Path] = []
     try:
+        _mkdir_tracked(target, created_dirs)
         for relative, content in rendered.items():
             destination = target / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_text(content, encoding="utf-8", newline="\n")
-            created.append(destination)
+            _mkdir_tracked(destination.parent, created_dirs)
+            destination = _assert_safe_destination(target, relative)
+            with destination.open("x", encoding="utf-8", newline="\n") as handle:
+                created.append(destination)
+                handle.write(content)
 
         runtime = target / "tools" / "codex_dm.py"
         validation = subprocess.run(
@@ -354,16 +542,15 @@ def create_campaign(answers_path: Path, target: Path, *, dry_run: bool = False) 
             )
     except Exception:
         for path in reversed(created):
-            path.unlink(missing_ok=True)
-        for directory in (target / "dashboard", target / "tools"):
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        for directory in reversed(created_dirs):
             try:
                 directory.rmdir()
             except OSError:
                 pass
-        try:
-            target.rmdir()
-        except OSError:
-            pass
         raise
 
     result["dashboard"] = str(target / "dashboard" / "index.html")

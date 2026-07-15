@@ -16,9 +16,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     create = subparsers.add_parser("create", help="create a campaign from normalized answers")
-    create.add_argument("--answers", required=True, type=Path, help="UTF-8 JSON answers file")
+    create.add_argument("--answers", required=True, help="UTF-8 JSON answers file, or '-' for stdin")
     create.add_argument("--target", required=True, type=Path, help="chosen campaign project root")
-    create.add_argument("--dry-run", action="store_true", help="validate and list files without writing")
+    create.add_argument("--dry-run", action="store_true", help="render and list planned files without writing the target")
 
     inspect = subparsers.add_parser("inspect-target", help="check whether a folder is safe to initialize")
     inspect.add_argument("--target", required=True, type=Path)
@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0
+    return 0 if result.get("ok") else 1
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 window.CODEX_DM_DATA = {
   "schema_version": 1,
-  "state_hash": "c2567b4ae04e81354062234791660b9c6a29767b54714bb7bab4cf90c0923230",
-  "generated_at": "2026-07-15T05:55:40Z",
+  "state_hash": "bd973fe2b6b653e8868e45b329f29a27cb27a396ea8c60cde061e66b0e078937",
+  "generated_at": "2026-07-15T06:32:23Z",
   "campaign": {
     "title": "Колокола Лунной Топи",
     "language": "ru",

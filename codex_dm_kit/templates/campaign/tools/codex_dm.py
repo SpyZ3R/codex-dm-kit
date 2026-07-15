@@ -175,6 +175,10 @@ def validate_campaign(root: Path, *, check_dashboard: bool = True) -> dict[str, 
     duplicate_locations = sorted({item for item in location_ids if location_ids.count(item) > 1})
     if duplicate_locations:
         errors.append("location IDs must be unique: " + ", ".join(duplicate_locations))
+    location_id_set = set(location_ids)
+    for raw in npcs:
+        if isinstance(raw, dict) and raw.get("location") is not None and raw.get("location") not in location_id_set:
+            errors.append(f"npc {raw.get('id', '?')} references unknown location: {raw.get('location')}")
     if world.get("current_location") not in set(location_ids):
         errors.append("world_state.current_location must reference an existing location")
 
@@ -209,15 +213,7 @@ def validate_campaign(root: Path, *, check_dashboard: bool = True) -> dict[str, 
     }
 
 
-def public_state_hash(root: Path) -> str:
-    digest = hashlib.sha256()
-    for name in ("campaign_meta.json", "player_state.json", "quests.json", "world_state.json", "locations.json"):
-        digest.update(name.encode("utf-8"))
-        digest.update((root / name).read_bytes())
-    return digest.hexdigest()
-
-
-def public_dashboard_data(root: Path) -> dict[str, Any]:
+def public_projection(root: Path) -> dict[str, Any]:
     meta = json.loads((root / "campaign_meta.json").read_text(encoding="utf-8"))
     player = json.loads((root / "player_state.json").read_text(encoding="utf-8"))
     quests = json.loads((root / "quests.json").read_text(encoding="utf-8"))
@@ -243,9 +239,6 @@ def public_dashboard_data(root: Path) -> dict[str, Any]:
         if isinstance(quest, dict)
     ]
     return {
-        "schema_version": SCHEMA_VERSION,
-        "state_hash": public_state_hash(root),
-        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "campaign": {
             "title": meta.get("title"),
             "language": meta.get("language"),
@@ -261,6 +254,25 @@ def public_dashboard_data(root: Path) -> dict[str, Any]:
             "current_location_name": location_names.get(world.get("current_location")),
             "player_reputation": world.get("player_reputation", {}),
         },
+    }
+
+
+def public_state_hash(root: Path) -> str:
+    payload = json.dumps(
+        public_projection(root),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def public_dashboard_data(root: Path) -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "state_hash": public_state_hash(root),
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        **public_projection(root),
     }
 
 

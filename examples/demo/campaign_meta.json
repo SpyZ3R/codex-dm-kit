@@ -6,5 +6,19 @@
   "title": "Колокола Лунной Топи",
   "language": "ru",
   "ruleset": "dnd_5e_light",
-  "created_at": "2026-07-15T05:55:40Z"
+  "created_at": "2026-07-15T05:55:40Z",
+  "preferences": {
+    "tone": "мрачноватое приключение с сухим юмором и реальными последствиями",
+    "boundaries": [
+      "без сексуального насилия",
+      "без подробного вреда детям"
+    ],
+    "lethality": "умеренная",
+    "play_mix": {
+      "exploration": 4,
+      "dialogue": 3,
+      "combat": 2,
+      "mystery": 5
+    }
+  }
 }
