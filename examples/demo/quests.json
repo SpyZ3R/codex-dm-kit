@@ -1,0 +1,17 @@
+{
+  "active": [
+    {
+      "id": "opening_hook",
+      "title": "Колокол под водой",
+      "goal": "Ночью под затопленным трактом зазвонил старый сигнальный колокол, а утром лодочник вернулся без собственной тени.",
+      "current_progress": "Кампания еще не началась.",
+      "known_facts": [],
+      "hidden_facts": [],
+      "possible_consequences": [],
+      "status": "active"
+    }
+  ],
+  "completed": [],
+  "failed": [],
+  "hidden": []
+}

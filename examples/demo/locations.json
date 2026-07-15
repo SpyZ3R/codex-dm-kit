@@ -1,0 +1,17 @@
+[
+  {
+    "id": "reedwatch-inn",
+    "name": "Постоялый двор «Сухой Камыш»",
+    "description": "Последний сухой дом перед затопленным трактом.",
+    "atmosphere": "мокрые сапоги у печи, запах речной мяты и один колокол, звенящий без ветра",
+    "inhabitants": [],
+    "dangers": [],
+    "visible_clues": [],
+    "secrets": [],
+    "related_npcs": [],
+    "related_quests": [
+      "opening_hook"
+    ],
+    "visual_description": ""
+  }
+]

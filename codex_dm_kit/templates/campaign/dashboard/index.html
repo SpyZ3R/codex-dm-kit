@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Codex DM character dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0c1018;
+      --panel: rgba(24, 30, 44, .92);
+      --panel-2: rgba(31, 39, 57, .88);
+      --line: rgba(176, 192, 227, .18);
+      --text: #f3f5fa;
+      --muted: #aeb8ca;
+      --gold: #e3ba68;
+      --cyan: #78d7d0;
+      --violet: #b79af5;
+      --danger: #ef8c8c;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(92, 120, 182, .18), transparent 34rem),
+        radial-gradient(circle at 95% 10%, rgba(126, 82, 165, .15), transparent 30rem),
+        var(--bg);
+      font: 15px/1.5 Inter, "Segoe UI", sans-serif;
+    }
+
+    main { width: min(1180px, calc(100% - 28px)); margin: 0 auto; padding: 28px 0 48px; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: end;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: linear-gradient(140deg, rgba(42, 52, 76, .95), rgba(18, 23, 35, .96));
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .24);
+    }
+
+    .eyebrow { margin: 0 0 5px; color: var(--cyan); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 4px; font: 700 clamp(28px, 5vw, 46px)/1.05 Georgia, serif; }
+    h2 { margin-bottom: 15px; font: 700 22px/1.2 Georgia, serif; }
+    h3 { margin-bottom: 6px; font-size: 14px; }
+    .muted { color: var(--muted); }
+    .world { max-width: 390px; text-align: right; }
+
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; margin-top: 16px; }
+    .card {
+      grid-column: span 6;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: 0 16px 50px rgba(0, 0, 0, .18);
+    }
+    .wide { grid-column: span 12; }
+    .third { grid-column: span 4; }
+
+    .pills, .stat-grid, .meters, .spell-grid { display: flex; flex-wrap: wrap; gap: 9px; }
+    .pill, .stat, .meter, .spell, .quest, .list-item {
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--panel-2);
+    }
+    .pill { padding: 6px 10px; color: var(--muted); }
+    .pill strong { color: var(--text); }
+    .stat { min-width: 104px; padding: 12px; text-align: center; }
+    .stat strong { display: block; font: 700 25px/1 Georgia, serif; color: var(--gold); }
+    .stat span { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+    .meter { min-width: 135px; flex: 1 1 145px; padding: 13px; }
+    .meter strong { display: block; margin-top: 3px; font-size: 22px; color: var(--cyan); }
+    .meter span { color: var(--muted); font-size: 12px; }
+
+    .spell-grid { align-items: stretch; }
+    .spell { flex: 1 1 240px; padding: 13px; }
+    .spell small { color: var(--violet); }
+    .spell p { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+    .quest { padding: 14px; margin-bottom: 10px; }
+    .quest:last-child { margin-bottom: 0; }
+    .quest p { margin: 6px 0 0; color: var(--muted); }
+    .list { display: grid; gap: 8px; }
+    .list-item { padding: 10px 12px; color: var(--muted); }
+    .empty { color: var(--muted); font-style: italic; }
+    .error { padding: 18px; border: 1px solid rgba(239, 140, 140, .4); border-radius: 14px; color: var(--danger); }
+    footer { margin-top: 18px; text-align: center; color: #798498; font-size: 12px; }
+
+    @media (max-width: 820px) {
+      header { align-items: start; flex-direction: column; }
+      .world { text-align: left; }
+      .card, .third, .wide { grid-column: span 12; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow" id="campaignTitle">Codex DM campaign</p>
+        <h1 id="playerName">Character dashboard</h1>
+        <p class="muted" id="identity">Waiting for campaign data.</p>
+      </div>
+      <div class="world" id="worldSummary"></div>
+    </header>
+
+    <div id="error" class="error" hidden></div>
+    <section id="content" class="grid" hidden>
+      <article class="card wide">
+        <h2 id="coreTitle">Core resources</h2>
+        <div class="meters" id="meters"></div>
+      </article>
+
+      <article class="card">
+        <h2 id="abilitiesTitle">Ability scores</h2>
+        <div class="stat-grid" id="stats"></div>
+      </article>
+
+      <article class="card">
+        <h2 id="skillsTitle">Skills and saves</h2>
+        <div class="pills" id="skills"></div>
+      </article>
+
+      <article class="card wide">
+        <h2 id="magicTitle">Magic</h2>
+        <div class="pills" id="slots"></div>
+        <div class="spell-grid" id="spells" style="margin-top:12px"></div>
+      </article>
+
+      <article class="card">
+        <h2 id="featuresTitle">Features</h2>
+        <div class="list" id="features"></div>
+      </article>
+
+      <article class="card">
+        <h2 id="equipmentTitle">Equipment</h2>
+        <div class="list" id="equipment"></div>
+      </article>
+
+      <article class="card wide">
+        <h2 id="goalsTitle">Active goals</h2>
+        <div id="quests"></div>
+      </article>
+    </section>
+
+    <footer id="footer">Generated from public campaign state. GM secrets are excluded.</footer>
+  </main>
+
+  <script src="./dashboard_data.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const sign = (value) => Number(value) >= 0 ? `+${value}` : String(value);
+    const text = (value, fallback = "—") => value === undefined || value === null || value === "" ? fallback : String(value);
+    const LABELS = {
+      en: {
+        core: "Core resources", abilities: "Ability scores", skills: "Skills and saves", magic: "Magic",
+        features: "Features", equipment: "Equipment", goals: "Active goals", speed: "Speed",
+        hitDice: "Hit dice", gold: "Gold", inspiration: "Inspiration", save: "Save", level: "Level",
+        cantrip: "Cantrip", noSlots: "No spell slots", noSpells: "No spells recorded.",
+        noSkills: "No skills recorded", none: "None recorded.", noGoals: "No active goals.",
+        activeGoal: "Active goal", noProgress: "No progress recorded.", generated: "Generated", state: "State"
+      },
+      ru: {
+        core: "Основные ресурсы", abilities: "Характеристики", skills: "Навыки и спасброски", magic: "Магия",
+        features: "Способности", equipment: "Снаряжение", goals: "Активные цели", speed: "Скорость",
+        hitDice: "Кости хитов", gold: "Золото", inspiration: "Вдохновение", save: "Спасбросок", level: "Уровень",
+        cantrip: "Заговор", noSlots: "Нет ячеек заклинаний", noSpells: "Заклинания не записаны.",
+        noSkills: "Навыки не записаны", none: "Нет записей.", noGoals: "Нет активных целей.",
+        activeGoal: "Активная цель", noProgress: "Прогресс не записан.", generated: "Сформировано", state: "Состояние"
+      }
+    };
+
+    function appendPill(container, label, value = null) {
+      const node = document.createElement("span");
+      node.className = "pill";
+      if (value === null) node.textContent = label;
+      else {
+        node.append(document.createTextNode(`${label}: `));
+        const strong = document.createElement("strong");
+        strong.textContent = text(value);
+        node.append(strong);
+      }
+      container.append(node);
+    }
+
+    function appendEmpty(container, label) {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = label;
+      container.append(empty);
+    }
+
+    function appendList(container, values, emptyLabel) {
+      container.replaceChildren();
+      if (!values || !values.length) {
+        appendEmpty(container, emptyLabel);
+        return;
+      }
+      values.forEach((value) => {
+        const node = document.createElement("div");
+        node.className = "list-item";
+        if (value && typeof value === "object") {
+          const name = value.name || value.title || "Feature";
+          const description = value.description || value.text || "";
+          const strong = document.createElement("strong");
+          strong.textContent = text(name);
+          node.append(strong);
+          if (description) {
+            node.append(document.createElement("br"));
+            node.append(document.createTextNode(text(description)));
+          }
+        } else node.textContent = String(value);
+        container.append(node);
+      });
+    }
+
+    function normalizeSpell(spell, level) {
+      if (typeof spell === "string") return { name: spell, level, description: "" };
+      return { name: spell.name || "Spell", level: spell.level ?? level, description: spell.description || "" };
+    }
+
+    function render(data) {
+      const player = data.player || {};
+      const world = data.world || {};
+      const campaign = data.campaign || {};
+      const language = campaign.language === "ru" ? "ru" : "en";
+      const labels = LABELS[language];
+      document.documentElement.lang = language;
+      $("coreTitle").textContent = labels.core;
+      $("abilitiesTitle").textContent = labels.abilities;
+      $("skillsTitle").textContent = labels.skills;
+      $("magicTitle").textContent = labels.magic;
+      $("featuresTitle").textContent = labels.features;
+      $("equipmentTitle").textContent = labels.equipment;
+      $("goalsTitle").textContent = labels.goals;
+      $("campaignTitle").textContent = campaign.title || "Codex DM campaign";
+      $("playerName").textContent = player.name || "Character";
+      $("identity").textContent = [player.race, player.class && `${player.class} ${player.level || ""}`, player.background].filter(Boolean).join(" · ");
+      const worldSummary = $("worldSummary");
+      worldSummary.replaceChildren();
+      const locationName = document.createElement("strong");
+      locationName.textContent = text(world.current_location_name);
+      const worldDetails = document.createElement("span");
+      worldDetails.className = "muted";
+      worldDetails.textContent = [world.date, world.time_of_day, world.weather].filter(Boolean).join(" · ");
+      worldSummary.append(locationName, document.createElement("br"), worldDetails);
+
+      const meters = $("meters");
+      meters.replaceChildren();
+      const meterValues = [
+        ["HP", `${text(player.hp?.current)} / ${text(player.hp?.max)}`],
+        ["AC", player.ac],
+        [labels.speed, player.speed],
+        [labels.hitDice, `${text(player.hit_dice?.current)} / ${text(player.hit_dice?.max)} ${text(player.hit_dice?.die, "")}`],
+        [labels.gold, player.gold],
+        [labels.inspiration, player.inspiration],
+      ];
+      meterValues.forEach(([label, value]) => {
+        const node = document.createElement("div");
+        node.className = "meter";
+        const caption = document.createElement("span");
+        caption.textContent = label;
+        const strong = document.createElement("strong");
+        strong.textContent = text(value);
+        node.append(caption, strong);
+        meters.append(node);
+      });
+
+      const stats = $("stats");
+      stats.replaceChildren();
+      Object.entries(player.stats || {}).forEach(([name, value]) => {
+        const node = document.createElement("div");
+        node.className = "stat";
+        const caption = document.createElement("span");
+        caption.textContent = name;
+        const strong = document.createElement("strong");
+        strong.textContent = text(value);
+        const modifier = document.createElement("small");
+        modifier.textContent = sign(player.modifiers?.[name] ?? 0);
+        node.append(caption, strong, modifier);
+        stats.append(node);
+      });
+
+      const skills = $("skills");
+      skills.replaceChildren();
+      Object.entries(player.saving_throws || {}).forEach(([name, value]) => appendPill(skills, `${labels.save} ${name}`, sign(value)));
+      Object.entries(player.skills || {}).forEach(([name, value]) => appendPill(skills, name, sign(value)));
+      if (!skills.childElementCount) appendPill(skills, labels.noSkills);
+
+      const spells = player.spells || {};
+      const slots = $("slots");
+      slots.replaceChildren();
+      Object.entries(spells.slots || {}).forEach(([level, slot]) => appendPill(slots, `${labels.level} ${level}`, `${slot.current} / ${slot.max}`));
+      if (!slots.childElementCount) appendPill(slots, labels.noSlots);
+
+      const spellList = $("spells");
+      spellList.replaceChildren();
+      const allSpells = [
+        ...(spells.cantrips || []).map((spell) => normalizeSpell(spell, 0)),
+        ...(spells.known_spells || []).map((spell) => normalizeSpell(spell, spell.level ?? "?")),
+      ];
+      allSpells.forEach((spell) => {
+        const node = document.createElement("div");
+        node.className = "spell";
+        const title = document.createElement("h3");
+        title.textContent = text(spell.name);
+        const level = document.createElement("small");
+        level.textContent = spell.level === 0 ? labels.cantrip : `${labels.level} ${spell.level}`;
+        node.append(title, level);
+        if (spell.description) {
+          const description = document.createElement("p");
+          description.textContent = text(spell.description);
+          node.append(description);
+        }
+        spellList.append(node);
+      });
+      if (!allSpells.length) appendEmpty(spellList, labels.noSpells);
+
+      appendList($("features"), player.features || [], labels.none);
+      appendList($("equipment"), player.equipment || [], labels.none);
+
+      const quests = $("quests");
+      quests.replaceChildren();
+      (data.quests || []).forEach((quest) => {
+        const node = document.createElement("article");
+        node.className = "quest";
+        const title = document.createElement("h3");
+        title.textContent = text(quest.title, labels.activeGoal);
+        const progress = document.createElement("p");
+        progress.textContent = text(quest.current_progress || quest.goal, labels.noProgress);
+        node.append(title, progress);
+        quests.append(node);
+      });
+      if (!quests.childElementCount) appendEmpty(quests, labels.noGoals);
+
+      $("footer").textContent = `${labels.generated} ${text(data.generated_at)} · ${labels.state} ${text(data.state_hash).slice(0, 12)}`;
+      $("content").hidden = false;
+    }
+
+    if (!window.CODEX_DM_DATA) {
+      $("error").hidden = false;
+      $("error").textContent = "Campaign data is missing. Run: python tools/codex_dm.py finalize";
+    } else {
+      try { render(window.CODEX_DM_DATA); }
+      catch (error) {
+        $("error").hidden = false;
+        $("error").textContent = `Dashboard error: ${error.message}`;
+      }
+    }
+  </script>
+</body>
+</html>

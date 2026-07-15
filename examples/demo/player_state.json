@@ -1,0 +1,74 @@
+{
+  "name": "Лисса Тихая",
+  "pronouns": "она",
+  "race": "человек",
+  "class": "следопыт",
+  "level": 2,
+  "background": "бывшая смотрительница речного маяка",
+  "backstory": {},
+  "alignment": "not specified",
+  "rest_state": "ready to begin",
+  "advancement": {
+    "method": "milestone",
+    "xp_tracking": false
+  },
+  "proficiency_bonus": 2,
+  "stats": {
+    "strength": 10,
+    "dexterity": 16,
+    "constitution": 14,
+    "intelligence": 12,
+    "wisdom": 15,
+    "charisma": 8
+  },
+  "modifiers": {
+    "strength": 0,
+    "dexterity": 3,
+    "constitution": 2,
+    "intelligence": 1,
+    "wisdom": 2,
+    "charisma": -1
+  },
+  "hp": {
+    "current": 20,
+    "max": 20,
+    "temp": 0
+  },
+  "hit_dice": {
+    "die": "d10",
+    "current": 2,
+    "max": 2,
+    "constitution_modifier": 2
+  },
+  "ac": 14,
+  "speed": 30,
+  "saving_throws": {},
+  "skills": {
+    "perception": 4,
+    "survival": 4,
+    "stealth": 5
+  },
+  "features": [
+    {
+      "name": "Глаз маячника",
+      "description": "Лисса быстро замечает неправильный свет и поддельные сигналы."
+    }
+  ],
+  "spells": {
+    "slots": {},
+    "cantrips": [],
+    "known_spells": []
+  },
+  "equipment": [
+    "длинный лук",
+    "20 стрел",
+    "фонарь с синим стеклом",
+    "дорожный плащ"
+  ],
+  "gold": 8,
+  "conditions": [],
+  "active_effects": [],
+  "inspiration": 0,
+  "known_clues": [],
+  "reputation": {}
+}

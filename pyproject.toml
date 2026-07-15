@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-dm-kit"
+version = "0.1.0"
+description = "A Codex-first, file-backed solo campaign kit for DnD 5e light"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "codex-dm-kit contributors" }]
+keywords = ["codex", "rpg", "dnd", "solo", "campaign"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+]
+
+[project.scripts]
+codex-dm-kit = "codex_dm_kit.__main__:main"
+
+[tool.setuptools]
+packages = ["codex_dm_kit"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+codex_dm_kit = [
+  "templates/campaign/*.tmpl",
+  "templates/campaign/tools/*.py",
+  "templates/campaign/dashboard/*.html",
+]
+
+[tool.unittest]
+start-directory = "tests"

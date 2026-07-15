@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "initialized": true,
+  "kit_version": "0.1.0",
+  "campaign_id": "moonlit-marsh",
+  "title": "Колокола Лунной Топи",
+  "language": "ru",
+  "ruleset": "dnd_5e_light",
+  "created_at": "2026-07-15T05:55:40Z"
+}
