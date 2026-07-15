@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-dm-kit"
-version = "0.1.0"
+version = "0.1.1"
 description = "A Codex-first, file-backed solo campaign kit for DnD 5e light"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -196,7 +196,7 @@ class GeneratorTests(unittest.TestCase):
             cwd=REPO_ROOT,
             input=ANSWERS.read_text(encoding="utf-8"),
             capture_output=True,
-            text=True,
+            encoding="utf-8",
             check=False,
         )
 
